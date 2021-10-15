@@ -1,0 +1,8 @@
+{
+  "Nickname": "RecombinePatch",
+  "Visibility": "IncludeButHide",
+  "OneLineDescription": "Recombine stuff",
+  "LongDescription": "TBD",
+  "PreferredAutoVersioning": "Default",
+  "RequiredMods": []
+}

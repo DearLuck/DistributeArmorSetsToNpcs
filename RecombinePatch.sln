@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RecombinePatch", "RecombinePatch\RecombinePatch.csproj", "{7E432FAB-D13D-4B93-9BD4-9B89CB81A178}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RecombinePatchTests", "RecombinePatchTests\RecombinePatchTests.csproj", "{25C94F28-9AA7-4AC3-9E41-991D5508696D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7E432FAB-D13D-4B93-9BD4-9B89CB81A178}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E432FAB-D13D-4B93-9BD4-9B89CB81A178}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E432FAB-D13D-4B93-9BD4-9B89CB81A178}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E432FAB-D13D-4B93-9BD4-9B89CB81A178}.Release|Any CPU.Build.0 = Release|Any CPU
+		{25C94F28-9AA7-4AC3-9E41-991D5508696D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{25C94F28-9AA7-4AC3-9E41-991D5508696D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{25C94F28-9AA7-4AC3-9E41-991D5508696D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{25C94F28-9AA7-4AC3-9E41-991D5508696D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
