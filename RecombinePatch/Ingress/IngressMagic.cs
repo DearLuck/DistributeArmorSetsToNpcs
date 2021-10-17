@@ -12,7 +12,7 @@ namespace RecombinePatch.Ingress
 {
     public static class IngressMagic
     {
-        private static IEnumerable<Entry> ValidLeveledListEntries(IngressCache ingressCache, ILeveledItemGetter item)
+        private static IEnumerable<LeveledEntry> ValidLeveledListEntries(IngressCache ingressCache, ILeveledItemGetter item)
         {
             if (item.ChanceNone == 100) yield break;
             var entries = item.Entries;
@@ -28,11 +28,44 @@ namespace RecombinePatch.Ingress
                 
                 if (!linkData.Reference.TryResolve(ingressCache.LinkCache, out var referencedItem)) continue;
                 
-                yield return new Entry
+                yield return new LeveledEntry
                 {
                     Item = referencedItem,
                     Level = linkData.Level,
                     Count = count,
+                };
+            }
+        }
+        
+        private static IEnumerable<IItemGetter> ValidOutfitEntries(IngressCache ingressCache, IOutfitGetter outfit)
+        {
+            if (outfit.Items == null) yield break;
+            
+            foreach (var linkGetter in outfit.Items)
+            {
+                if (!linkGetter.TryResolve<IItemGetter>(ingressCache.LinkCache, out var referencedItem)) continue;
+                yield return referencedItem;
+            }
+        }
+        
+        private static IEnumerable<Entry> ValidContainerEntries(IngressCache ingressCache, IContainerGetter container)
+        {
+            if (container.Items == null) yield break;
+            
+            foreach (var containerItem in container.Items)
+            {
+                var item = containerItem.Item;
+                
+                var count = item.Count;
+                if (count <= 0) continue;
+                
+                var reference = item.Item;
+                if (!reference.TryResolve(ingressCache.LinkCache, out var referencedItem)) continue;
+
+                yield return new Entry
+                {
+                    Count = count,
+                    Item = referencedItem,
                 };
             }
         }
@@ -118,7 +151,7 @@ namespace RecombinePatch.Ingress
             }
         }
         
-        public static RecombineGroup? ArmorGroupFromLeveledList(IngressCache ingressCache, ILeveledItemGetter item)
+        public static RecombineGroup? GroupFromLeveledList(IngressCache ingressCache, ILeveledItemGetter item)
         {
             if (ingressCache.GroupCache.TryGetValue(item.FormKey, out var res))
             {
@@ -131,19 +164,19 @@ namespace RecombinePatch.Ingress
             {
                 if (entry.Item is IArmorGetter armor)
                 {
-                    result.MergeItem(armor, entry.Drop);
+                    result.MergeItem(armor, entry.Drop, 1);
                 }
                 else if (entry.Item is IWeaponGetter weap)
                 {
-                    result.MergeItem(weap, entry.Drop);
+                    result.MergeItem(weap, entry.Drop, 1);
                 }
-                else if (entry.Item is IMiscItem misc)
-                {
-                    result.MergeItem(misc, entry.Drop);
-                }
+                // else if (entry.Item is IMiscItem misc)
+                // {
+                //     result.MergeItem(misc, entry.Drop, 1);
+                // }
                 else if (entry.Item is ILeveledItemGetter leveledItem)
                 {
-                    var subArmorGroup = ArmorGroupFromLeveledList(ingressCache, leveledItem);
+                    var subArmorGroup = GroupFromLeveledList(ingressCache, leveledItem);
                     if (subArmorGroup != null)
                     {
                         result.MergeLeveledList(subArmorGroup, entry.Drop, subArmorGroup.ListChance);
@@ -156,6 +189,94 @@ namespace RecombinePatch.Ingress
                 : result;
             
             ingressCache.GroupCache[item.FormKey] = res;
+
+            return res;
+        }
+
+        public static RecombineGroup? GroupFromOutfit(IngressCache ingressCache, IOutfitGetter outfit)
+        {
+            if (ingressCache.GroupCache.TryGetValue(outfit.FormKey, out var res))
+            {
+                return res;
+            }
+            
+            var result = RecombineGroup.ForOutfit(outfit);
+            
+            foreach (var item in ValidOutfitEntries(ingressCache, outfit))
+            {
+                var dropChance = Drop.Flat(1.0f);
+                
+                if (item is IArmorGetter armor)
+                {
+                    result.MergeItem(armor, dropChance, 1);
+                }
+                else if (item is IWeaponGetter weap)
+                {
+                    result.MergeItem(weap, dropChance, 1);
+                }
+                // else if (item is IMiscItem misc)
+                // {
+                //     result.MergeItem(misc, dropChance, 1);
+                // }
+                else if (item is ILeveledItemGetter leveledItem)
+                {
+                    var subItemGroup = GroupFromLeveledList(ingressCache, leveledItem);
+                    if (subItemGroup != null)
+                    {
+                        result.MergeLeveledList(subItemGroup, dropChance, subItemGroup.ListChance);
+                    }
+                }
+            }
+            
+            res = result.Items.Count == 0
+                ? null
+                : result;
+            
+            ingressCache.GroupCache[outfit.FormKey] = res;
+
+            return res;
+        }
+        
+        public static RecombineGroup? GroupFromContainer(IngressCache ingressCache, IContainerGetter container)
+        {
+            if (ingressCache.GroupCache.TryGetValue(container.FormKey, out var res))
+            {
+                return res;
+            }
+            
+            var result = RecombineGroup.ForContainer(container);
+            
+            foreach (var entry in ValidContainerEntries(ingressCache, container))
+            {
+                var dropChance = Drop.Flat(1.0f * entry.Count);
+                
+                if (entry.Item is IArmorGetter armor)
+                {
+                    result.MergeItem(armor, dropChance, 1);
+                }
+                else if (entry.Item is IWeaponGetter weap)
+                {
+                    result.MergeItem(weap, dropChance, 1);
+                }
+                // else if (entry.Item is IMiscItem misc)
+                // {
+                //     result.MergeItem(misc, dropChance, 1);
+                // }
+                else if (entry.Item is ILeveledItemGetter leveledItem)
+                {
+                    var subItemGroup = GroupFromLeveledList(ingressCache, leveledItem);
+                    if (subItemGroup != null)
+                    {
+                        result.MergeLeveledList(subItemGroup, dropChance, subItemGroup.ListChance);
+                    }
+                }
+            }
+            
+            res = result.Items.Count == 0
+                ? null
+                : result;
+            
+            ingressCache.GroupCache[container.FormKey] = res;
 
             return res;
         }

@@ -3,7 +3,7 @@
     public record PluginV1
     (
         string FileName,
-        string Name,
+        string ModKey,
         string Type
     );
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Synthesis;
@@ -7,9 +8,9 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mutagen.Bethesda.Plugins;
 using Noggog;
 using RecombinePatch.Ingress;
 using RecombinePatch.Ingress.DtoV1;
@@ -65,48 +66,224 @@ namespace RecombinePatch
             var linkCache = loadOrder.ToImmutableLinkCache<ISkyrimMod, ISkyrimModGetter>(); 
             var ingressCache = new IngressCache(linkCache);
 
-            var pluginsDto = enabledAndExisting
+            var pluginsByModKey = enabledAndExisting
                 .Reverse()
-                .Select(m => MapperV1.ModV1(m.ModKey))
-                .ToImmutableArray();
-            
-            foreach (var item in enabledAndExisting.WinningOverrides<ILeveledItemGetter>())
+                .Select((m, i) => new { Key = m.ModKey, Index = i, Plugin = MapperV1.ModV1(m.ModKey) })
+                .ToImmutableDictionary(p => p.Key, p => new { p.Index, p.Plugin });
+
+            var itemsByFormKey = enabledAndExisting.WinningOverrides<IArmorGetter>().Select(g => g.FormKey)
+                .Concat(enabledAndExisting.WinningOverrides<IWeaponGetter>().Select(g => g.FormKey))
+                // .Concat(enabledAndExisting.WinningOverrides<IMiscItemGetter>().Select(g => g.FormKey))
+                .Concat(enabledAndExisting.WinningOverrides<ILeveledItemGetter>().Select(g => g.FormKey))
+                .Concat(enabledAndExisting.WinningOverrides<IOutfitGetter>().Select(g => g.FormKey))
+                .Concat(enabledAndExisting.WinningOverrides<IContainerGetter>().Select(g => g.FormKey))
+                .Select((k, i) => (k, i))
+                .ToImmutableDictionary(g => g.k, g => new { PluginIndex = pluginsByModKey[g.k.ModKey].Index, ItemIndex = g.i });
+
+            var itemDirectLeveledLists = new Dictionary<FormKey, List<int>>();
+            var itemOutfits = new Dictionary<FormKey, List<int>>();
+            var itemContainers = new Dictionary<FormKey, List<int>>();
+            var leveledLists = new Dictionary<int, LeveledItemV1>();
+            var outfits = new Dictionary<int, OutfitV1>();
+            var containers = new Dictionary<int, ContainerV1>();
+            var itemGroups = new Dictionary<int, IDictionary<int, ItemGroupEntryV1>>();
+
+            foreach (var leveledItem in enabledAndExisting.WinningOverrides<ILeveledItemGetter>())
             {
-                if (true || item.EditorID == "DeathItemDraugr")
-                // if (item.EditorID == "DeathItemGiant")
+                var group = IngressMagic.GroupFromLeveledList(ingressCache, leveledItem);
+                if (group != null)
                 {
-                    if (item.Flags.And(LeveledItem.Flag.UseAll) > 0)
+                    var groupEntries = new Dictionary<int, ItemGroupEntryV1>(group.Items.Count);
+                    
+                    foreach (var groupItem in group.Items)
                     {
-                        var group = IngressMagic.ArmorGroupFromLeveledList(ingressCache, item);
-                        // if (group != null)
-                        // {
-                        //     Console.WriteLine($"Set {item.FormKey} {item.EditorID} {group.ListChance}:");
-                        //     foreach (var (formKey, groupItem) in group.Items)
-                        //     {
-                        //         Console.WriteLine($"  - {formKey} {groupItem.Item.EditorID}");
-                        //         groupItem.WriteLine("    ");
-                        //     }
-                        // }
+                        if (groupItem.Value.ActualEntryCount > 0)
+                        {
+                            if (itemDirectLeveledLists.TryGetValue(groupItem.Key, out var entry2))
+                            {
+                                entry2.Add(itemsByFormKey[leveledItem.FormKey].ItemIndex);
+                            }
+                            else
+                            {
+                                itemDirectLeveledLists.Add(groupItem.Key,
+                                    new[] { itemsByFormKey[leveledItem.FormKey].ItemIndex }.ToList());
+                            }
+                        }
+
+                        groupEntries.Add(itemsByFormKey[groupItem.Value.Item.FormKey].ItemIndex, new ItemGroupEntryV1(
+                            groupItem.Value.DropBranches.Keys.Select(k => itemsByFormKey[k].ItemIndex).ToImmutableArray(),
+                            groupItem.Value.Drops.Flat != null 
+                                ? new [] { new KeyValuePair<short, float>(1, groupItem.Value.Drops.Flat.Value) }.ToImmutableDictionary()
+                                : groupItem.Value.Drops.Leveled!.Value
+                                    .Items
+                                    .GroupBy(ch => ch.Key.From ?? 1)
+                                    .ToImmutableDictionary(g => g.Key, g => g.First().Value)
+                        ));
                     }
+                    
+                    itemGroups.Add(itemsByFormKey[group.FormKey].ItemIndex, groupEntries);
                 }
+
+                leveledLists.Add(
+                    itemsByFormKey[leveledItem.FormKey].ItemIndex, 
+                    new LeveledItemV1(
+                        leveledItem.EditorID, 
+                        group == null 
+                            ? null 
+                            : itemsByFormKey[group.FormKey].ItemIndex
+                    ));
             }
+            
+            foreach (var outfitItem in enabledAndExisting.WinningOverrides<IOutfitGetter>())
+            {
+                var group = IngressMagic.GroupFromOutfit(ingressCache, outfitItem);
+                if (group != null)
+                {
+                    var groupEntries = new Dictionary<int, ItemGroupEntryV1>(group.Items.Count);
+                    
+                    foreach (var groupItem in group.Items)
+                    {
+                        if (itemOutfits.TryGetValue(groupItem.Key, out var entry2))
+                        {
+                            entry2.Add(itemsByFormKey[outfitItem.FormKey].ItemIndex);
+                        }
+                        else
+                        {
+                            itemOutfits.Add(groupItem.Key,
+                                new[] { itemsByFormKey[outfitItem.FormKey].ItemIndex }.ToList());
+                        }
+
+                        groupEntries.Add(itemsByFormKey[groupItem.Value.Item.FormKey].ItemIndex, new ItemGroupEntryV1(
+                            groupItem.Value.DropBranches.Keys.Select(k => itemsByFormKey[k].ItemIndex).ToImmutableArray(),
+                            groupItem.Value.Drops.Flat != null 
+                                ? new [] { new KeyValuePair<short, float>(1, groupItem.Value.Drops.Flat.Value) }.ToImmutableDictionary()
+                                : groupItem.Value.Drops.Leveled!.Value
+                                    .Items
+                                    .GroupBy(ch => ch.Key.From ?? 1)
+                                    .ToImmutableDictionary(g => g.Key, g => g.First().Value)
+                        ));
+                    }
+                    
+                    itemGroups.Add(itemsByFormKey[group.FormKey].ItemIndex, groupEntries);
+                }
+
+                outfits.Add(
+                    itemsByFormKey[outfitItem.FormKey].ItemIndex, 
+                    new OutfitV1(
+                        outfitItem.EditorID, 
+                        group == null 
+                            ? null 
+                            : itemsByFormKey[group.FormKey].ItemIndex
+                    ));
+            }
+            
+            foreach (var containerItem in enabledAndExisting.WinningOverrides<IContainerGetter>())
+            {
+                var group = IngressMagic.GroupFromContainer(ingressCache, containerItem);
+                if (group != null)
+                {
+                    var groupEntries = new Dictionary<int, ItemGroupEntryV1>(group.Items.Count);
+                    
+                    foreach (var groupItem in group.Items)
+                    {
+                        if (itemContainers.TryGetValue(groupItem.Key, out var entry2))
+                        {
+                            entry2.Add(itemsByFormKey[containerItem.FormKey].ItemIndex);
+                        }
+                        else
+                        {
+                            itemContainers.Add(groupItem.Key,
+                                new[] { itemsByFormKey[containerItem.FormKey].ItemIndex }.ToList());
+                        }
+
+                        groupEntries.Add(itemsByFormKey[groupItem.Value.Item.FormKey].ItemIndex, new ItemGroupEntryV1(
+                            groupItem.Value.DropBranches.Keys.Select(k => itemsByFormKey[k].ItemIndex).ToImmutableArray(),
+                            groupItem.Value.Drops.Flat != null 
+                                ? new [] { new KeyValuePair<short, float>(1, groupItem.Value.Drops.Flat.Value) }.ToImmutableDictionary()
+                                : groupItem.Value.Drops.Leveled!.Value
+                                    .Items
+                                    .GroupBy(ch => ch.Key.From ?? 1)
+                                    .ToImmutableDictionary(g => g.Key, g => g.First().Value)
+                        ));
+                    }
+                    
+                    itemGroups.Add(itemsByFormKey[group.FormKey].ItemIndex, groupEntries);
+                }
+
+                containers.Add(
+                    itemsByFormKey[containerItem.FormKey].ItemIndex, 
+                    new ContainerV1(
+                        containerItem.EditorID, 
+                        group == null 
+                            ? null 
+                            : itemsByFormKey[group.FormKey].ItemIndex
+                    ));
+            }
+
+            var armorItems = enabledAndExisting.WinningOverrides<IArmorGetter>()
+                .ToImmutableDictionary(g => itemsByFormKey[g.FormKey].ItemIndex, g => new ArmorV1(
+                    g.EditorID,
+                    g.Name?.String,
+                    itemOutfits.TryGetValue(g.FormKey, out var lists)
+                        ? lists.ToImmutableArray()
+                        : ImmutableArray<int>.Empty,
+                    itemContainers.TryGetValue(g.FormKey, out var lists2)
+                        ? lists2.ToImmutableArray()
+                        : ImmutableArray<int>.Empty,
+                    itemDirectLeveledLists.TryGetValue(g.FormKey, out var lists3)
+                        ? lists3.ToImmutableArray()
+                        : ImmutableArray<int>.Empty
+                ));
+            
+            var weaponItems = enabledAndExisting.WinningOverrides<IWeaponGetter>()
+                .ToImmutableDictionary(g => itemsByFormKey[g.FormKey].ItemIndex, g => new WeaponV1(
+                    g.EditorID,
+                    g.Name?.String,
+                    itemOutfits.TryGetValue(g.FormKey, out var lists)
+                        ? lists.ToImmutableArray()
+                        : ImmutableArray<int>.Empty,
+                    itemContainers.TryGetValue(g.FormKey, out var lists2)
+                        ? lists2.ToImmutableArray()
+                        : ImmutableArray<int>.Empty,
+                    itemDirectLeveledLists.TryGetValue(g.FormKey, out var lists3)
+                        ? lists3.ToImmutableArray()
+                        : ImmutableArray<int>.Empty
+                ));
 
             var ingressDto = new RootV1(
                 "1.0.0",
                 state.GameRelease.ToString(),
                 state.DataFolderPath,
                 MapperV1.ModV1(state.PatchMod.ModKey),
-                pluginsDto
+                pluginsByModKey
+                    .ToImmutableDictionary(
+                        kv => kv.Value.Index, 
+                        kv => kv.Value.Plugin),
+                itemsByFormKey
+                    .ToImmutableDictionary(
+                        kv => kv.Value.ItemIndex, 
+                        kv => new FormKeyV1(kv.Value.PluginIndex, $"{kv.Key.ID:x}")),
+                armorItems,
+                weaponItems,
+                leveledLists,
+                outfits,
+                containers,
+                itemGroups
             );
-            var ingressDtoStr = JsonSerializer.Serialize(ingressDto, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                NumberHandling = JsonNumberHandling.Strict,
-                IgnoreNullValues = false,
-            });
             
             Console.WriteLine($"Writing {ingressFilePath.FullName}...");
-            File.WriteAllText(ingressFilePath.FullName, ingressDtoStr, Encoding.UTF8);
+            var jsonOptions = new JsonSerializerOptions
+            {
+                NumberHandling = JsonNumberHandling.Strict,
+                IgnoreNullValues = true,
+                WriteIndented = true,
+            };
+
+            using (var fileStream = new FileStream(ingressFilePath.FullName, FileMode.Truncate))
+            {
+                JsonSerializer.SerializeAsync(fileStream, ingressDto, jsonOptions).Wait();
+            }
+            
             Console.WriteLine($"Done writing {ingressFilePath.FullName}.");
         }
     }

@@ -11,18 +11,25 @@ namespace RecombinePatch.Analysis.Groups
         public DropStats Drops { get; }
         public Dictionary<FormKey, DropBranch> DropBranches { get; }
         
-        public GroupItem(IItemGetter item, Drop drop)
+        /// <summary>
+        /// This list or outfit has this item added directly instead of over another list
+        /// </summary>
+        public int ActualEntryCount { get; set; }
+        
+        public GroupItem(IItemGetter item, Drop drop, int actualEntryCount)
         {
             Item = item;
             Drops = DropStats.From(drop);
             DropBranches = new Dictionary<FormKey, DropBranch>();
+            ActualEntryCount = actualEntryCount;
         }
         
-        private GroupItem(IItemGetter item, DropStats drops, Dictionary<FormKey, DropBranch> dropBranches)
+        private GroupItem(IItemGetter item, DropStats drops, Dictionary<FormKey, DropBranch> dropBranches, int actualEntryCount)
         {
             Item = item;
             Drops = drops;
             DropBranches = dropBranches;
+            ActualEntryCount = actualEntryCount;
         }
 
         public static GroupItem? FromSubGroup(IItemGetter item, Drop leveledListDrop, RecombineGroup subRecombineGroup, GroupItem subItem, float listChance)
@@ -51,7 +58,7 @@ namespace RecombinePatch.Analysis.Groups
                     new DropBranch(subRecombineGroup.LeveledItem, subItem.Drops, subItem.DropBranches));
             }
 
-            return new GroupItem(item, drops, dropBranches);
+            return new GroupItem(item, drops, dropBranches, 0);
         }
 
         public void MergeSubGroup(Drop leveledListDrop, RecombineGroup subRecombineGroup, GroupItem subItem, float listChance)

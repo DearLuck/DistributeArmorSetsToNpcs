@@ -21,24 +21,40 @@ namespace RecombinePatch.Analysis.Groups
             return new RecombineGroup(leveledItem.FormKey, leveledItem.EditorID, leveledItem, (100 - leveledItem.ChanceNone) / 100f);
         }
 
+        public static RecombineGroup ForOutfit(IOutfitGetter outfit)
+        {
+            return new RecombineGroup(outfit.FormKey, outfit.EditorID, null, 1.0f);
+        }
+        
+        public static RecombineGroup ForContainer(IContainerGetter container)
+        {
+            return new RecombineGroup(container.FormKey, container.EditorID, null, 1.0f);
+        }
+
         public string DisplayName { get; }
+
         public FormKey FormKey { get; }
+
         public string? EditorId { get; }
+
         public float ListChance { get; }
+
         public ILeveledItemGetter? LeveledItem { get; set; }
+
         public readonly Dictionary<FormKey, GroupItem> Items = new();
 
-        public void MergeItem(IItemGetter item, Drop drop)
+        public void MergeItem(IItemGetter item, Drop drop, int actualEntryCount)
         {
             // if (item.EditorID != "IWHonedSilverWarAxe") return;
             
             if (Items.TryGetValue(item.FormKey, out var existing))
             {
                 existing.Drops.Add(drop);
+                existing.ActualEntryCount += actualEntryCount;
             }
             else
             {
-                Items.Add(item.FormKey, new GroupItem(item, drop));
+                Items.Add(item.FormKey, new GroupItem(item, drop, actualEntryCount));
             }
         }
 

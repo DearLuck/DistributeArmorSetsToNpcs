@@ -7,7 +7,7 @@ namespace RecombinePatch.Ingress
     {
         public static PluginV1 ModV1(ModKey modKey)
         {
-            return new PluginV1(modKey.FileName, modKey.Name, 
+            return new PluginV1(modKey.FileName, modKey.ToString(), 
                 modKey.Type == ModType.Master 
                     ? "master"
                     : modKey.Type == ModType.Plugin
