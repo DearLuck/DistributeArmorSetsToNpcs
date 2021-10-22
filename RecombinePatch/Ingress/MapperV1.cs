@@ -5,14 +5,16 @@ namespace RecombinePatch.Ingress
 {
     public class MapperV1
     {
-        public static PluginV1 ModV1(ModKey modKey)
+        public static PluginV1 ModV1(ushort index, ModKey modKey)
         {
-            return new PluginV1(modKey.FileName, modKey.ToString(), 
-                modKey.Type == ModType.Master 
-                    ? "master"
-                    : modKey.Type == ModType.Plugin
-                        ? "plugin"
-                        : "light");
+            return new PluginV1(
+                index, 
+                modKey.Type switch
+                {
+                    ModType.Master => PluginType.Master,
+                    ModType.Plugin => PluginType.Plugin,
+                    _ => PluginType.LightMaster
+                }, modKey.ToString());
         }
     }
 }

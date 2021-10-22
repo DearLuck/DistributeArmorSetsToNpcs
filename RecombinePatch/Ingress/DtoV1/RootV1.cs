@@ -1,94 +1,46 @@
 ﻿using System.Collections.Generic;
+using MessagePack;
 
 namespace RecombinePatch.Ingress.DtoV1
 {
+    [MessagePackObject]
     public class RootV1
     {
-        public RootV1(string version,
-            string gameRelease,
-            string gameDataPath,
-            PluginV1 patch,
-            IDictionary<int, PluginV1> plugins,
-            IDictionary<int, FormKeyV1> formKeys,
-            IDictionary<int, ArmorV1> armorItems,
-            IDictionary<int, WeaponV1> weaponItems,
-            IDictionary<int, LeveledItemV1> leveledItems,
-            IDictionary<int, OutfitV1> outfits, 
-            IDictionary<int, ContainerV1> containers,
-            IDictionary<int, IDictionary<int, ItemGroupEntryV1>> itemGroups)
+        public RootV1(uint version, string gameRelease, string gameDataPath, 
+            PluginV1 patch, PluginV1[] plugins, 
+            ArmorV1[] armors, WeaponV1[] weapons, MiscV1[] miscs, 
+            List<LeveledItemV1> leveledItems, List<OutfitV1> outfits, List<ContainerV1> containers, 
+            List<ItemGroupV1> itemGroups)
         {
             Version = version;
             GameRelease = gameRelease;
             GameDataPath = gameDataPath;
             Patch = patch;
             Plugins = plugins;
-            FormKeys = formKeys;
-            ArmorItems = armorItems;
-            WeaponItems = weaponItems;
+            Armors = armors;
+            Weapons = weapons;
+            Miscs = miscs;
             LeveledItems = leveledItems;
-            ItemGroups = itemGroups;
             Outfits = outfits;
             Containers = containers;
+            ItemGroups = itemGroups;
         }
 
-        /// <summary>
-        /// File version - for compatibility check.
-        /// </summary>
-        public string Version { get; }
+        [Key(0)] public readonly uint Version;
+        [Key(1)] public readonly string GameRelease;
+        [Key(2)] public readonly string GameDataPath;
         
-        /// <summary>
-        /// Game release name.
-        /// </summary>
-        public string GameRelease { get; }
+        [Key(3)] public readonly PluginV1 Patch;
+        [Key(4)] public readonly PluginV1[] Plugins;
         
-        /// <summary>
-        /// Full path to the game's Data folder
-        /// </summary>
-        public string GameDataPath { get; }
+        [Key(5)] public readonly ArmorV1[] Armors;
+        [Key(6)] public readonly WeaponV1[] Weapons;
+        [Key(7)] public readonly MiscV1[] Miscs;
         
-        /// <summary>
-        /// Target plugin that will contain the patch.
-        /// </summary>
-        public PluginV1 Patch { get; }
+        [Key(8)] public readonly List<LeveledItemV1> LeveledItems;
+        [Key(9)] public readonly List<OutfitV1> Outfits;
+        [Key(10)] public readonly List<ContainerV1> Containers;
         
-        /// <summary>
-        /// List of all plugins seen by patcher. Key is export-only plugin id.
-        /// </summary>
-        public IDictionary<int, PluginV1> Plugins { get; }
-        
-        /// <summary>
-        /// Key is export-only form key id. Value is combination of export-only plugin id and mod-local form id.
-        /// </summary>
-        public IDictionary<int, FormKeyV1> FormKeys { get; }
-
-        /// <summary>
-        /// Key is export-only form-id.
-        /// </summary>
-        public IDictionary<int, ArmorV1> ArmorItems { get; }
-        
-        /// <summary>
-        /// Key is export-only form-id.
-        /// </summary>
-        public IDictionary<int, WeaponV1> WeaponItems { get; }
-        
-        /// <summary>
-        /// Key is export-only form-id.
-        /// </summary>
-        public IDictionary<int, LeveledItemV1> LeveledItems { get; }
-        
-        /// <summary>
-        /// Key is export-only form-id.
-        /// </summary>
-        public IDictionary<int, OutfitV1> Outfits { get; }
-        
-        /// <summary>
-        /// Key is export-only form-id.
-        /// </summary>
-        public IDictionary<int, ContainerV1> Containers { get; }
-        
-        /// <summary>
-        /// Key is export-only id identifying the item group.
-        /// </summary>
-        public IDictionary<int, IDictionary<int, ItemGroupEntryV1>> ItemGroups { get; }
+        [Key(11)] public readonly List<ItemGroupV1> ItemGroups;
     };
 }

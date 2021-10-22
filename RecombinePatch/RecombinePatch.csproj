@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MessagePack" Version="2.3.85" />
     <PackageReference Include="Mutagen.Bethesda" Version="0.32.0" />
     <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.32.0" />
     <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.20.2" />
